@@ -17,6 +17,7 @@
  */
 
 #include "angband.h"
+#include "game-difficulty.h"
 #include "cmd-core.h"
 #include "cmds.h"
 #include "game-event.h"
@@ -1305,8 +1306,9 @@ void do_cmd_accept_character(struct command *cmd)
 	character_generated = true;
 	player->upkeep->playing = true;
 
-	/* Second Wind: seed the opening charge from the birth option */
-	player->second_wind = OPT(player, birth_second_wind) ? 1 : 0;
+	/* Second Wind: seed charges from the active difficulty preset */
+	player->second_wind = OPT(player, birth_second_wind) ?
+		MAX(1, preset_second_wind_charges) : 0;
 
 	/* Disable repeat command, so we don't try to be born again */
 	cmd_disable_repeat();

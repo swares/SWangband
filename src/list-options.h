@@ -93,6 +93,8 @@ OP(birth_no_selling,      "Increase gold drops but disable selling",
 BIRTH, true)
 OP(easy_stores,           "Town shops always stock survival staples",
 	INTERFACE, false)
+OP(show_threat_meter,     "Show danger telemetry (threat meter) during play",
+	INTERFACE, false)
 OP(birth_start_kit,       "Start with a kit of useful gear",
 BIRTH, true)
 OP(birth_ai_learn,        "Monsters learn from their mistakes",

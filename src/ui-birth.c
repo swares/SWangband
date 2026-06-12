@@ -17,6 +17,7 @@
  */
 
 #include "angband.h"
+#include "game-difficulty.h"
 #include "cmds.h"
 #include "cmd-core.h"
 #include "game-event.h"
@@ -62,6 +63,7 @@ enum birth_stage
 	BIRTH_BACK = -1,
 	BIRTH_RESET = 0,
 	BIRTH_QUICKSTART,
+	BIRTH_PRESET_CHOICE,
 	BIRTH_RACE_CHOICE,
 	BIRTH_CLASS_CHOICE,
 	BIRTH_ROLLER_CHOICE,
@@ -100,6 +102,72 @@ bool arg_force_name;
  * ------------------------------------------------------------------------
  * Quickstart? screen.
  * ------------------------------------------------------------------------ */
+
+/**
+ * ------------------------------------------------------------------------
+ * Difficulty preset picker — shown as the very first birth step.
+ * ------------------------------------------------------------------------ */
+static enum birth_stage textui_birth_preset(void)
+{
+	int sel = DIFFICULTY_ADVENTURER;
+	int i;
+	char buf[120];
+	enum birth_stage next = BIRTH_PRESET_CHOICE;
+
+	const char *labels[DIFFICULTY_COUNT + 1];
+	for (i = 0; i < DIFFICULTY_COUNT; i++)
+		labels[i] = difficulty_preset_name(i);
+	labels[DIFFICULTY_COUNT] = NULL;
+
+	Term_clear();
+
+	prt("Difficulty", 1, 1);
+	prt("Choose a difficulty preset.  You can still change individual options later.", 2, 1);
+	prt("(Use arrow keys or 1-3 to select; Enter to confirm; ? for help)", 3, 1);
+
+	while (next == BIRTH_PRESET_CHOICE) {
+		/* Draw the three preset cards */
+		for (i = 0; i < DIFFICULTY_COUNT; i++) {
+			uint8_t attr = (i == sel) ? COLOUR_L_GREEN : COLOUR_WHITE;
+			strnfmt(buf, sizeof(buf), "%d) %-12s  %s",
+				i + 1,
+				difficulty_preset_name(i),
+				difficulty_preset_desc(i));
+			c_prt(attr, buf, 5 + i * 3, 3);
+			if (i == 1)	/* Recommended tag */
+				c_put_str(COLOUR_YELLOW, "[Recommended]", 5 + i * 3, 70);
+		}
+
+		prt("", 5 + DIFFICULTY_COUNT * 3, 0);	/* clear any stale line */
+
+		struct keypress ke = inkey();
+
+		if (ke.code == '1' || ke.code == '2' || ke.code == '3') {
+			sel = ke.code - '1';
+		} else if (ke.code == ARROW_DOWN || ke.code == 'j') {
+			sel = (sel + 1) % DIFFICULTY_COUNT;
+		} else if (ke.code == ARROW_UP || ke.code == 'k') {
+			sel = (sel + DIFFICULTY_COUNT - 1) % DIFFICULTY_COUNT;
+		} else if (ke.code == KC_ENTER || ke.code == '\r') {
+			apply_difficulty_preset(player, sel);
+			next = BIRTH_RACE_CHOICE;
+		} else if (ke.code == ESCAPE && terms_disconnecting) {
+			quit(NULL);
+		} else if (ke.code == '?') {
+			/* Brief inline help */
+			prt("Wanderer: 3 extra lives, threat meter, generous gold. Good for learning.", 14, 3);
+			prt("Adventurer: 1 extra life, threat meter. Recommended first run.", 15, 3);
+			prt("Legend: pure permadeath. No net, no warnings. For veterans.", 16, 3);
+		} else if (ke.code == '=') {
+			apply_difficulty_preset(player, sel);
+			do_cmd_options_birth();	/* let them customise right now */
+		}
+	}
+
+	clear_from(0);
+	return next;
+}
+
 static enum birth_stage textui_birth_quickstart(void)
 //phantom name change changes
 {
@@ -117,7 +185,7 @@ static enum birth_stage textui_birth_quickstart(void)
 		
 		if (ke.code == 'N' || ke.code == 'n') {
 			cmdq_push(CMD_BIRTH_RESET);
-			next = BIRTH_RACE_CHOICE;
+			next = BIRTH_PRESET_CHOICE;
 		} else if (ke.code == KTRL('X')
 				|| (ke.code == ESCAPE && terms_disconnecting)) {
 			quit(NULL);
@@ -1621,7 +1689,7 @@ int textui_do_birth(void)
 				if (quickstart_allowed)
 					next = BIRTH_QUICKSTART;
 				else
-					next = BIRTH_RACE_CHOICE;
+					next = BIRTH_PRESET_CHOICE;
 
 				break;
 			}
@@ -1632,6 +1700,12 @@ int textui_do_birth(void)
 				next = textui_birth_quickstart();
 				if (next == BIRTH_COMPLETE)
 					done = true;
+				break;
+			}
+
+			case BIRTH_PRESET_CHOICE:
+			{
+				next = textui_birth_preset();
 				break;
 			}
 

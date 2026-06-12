@@ -177,6 +177,7 @@ ANGFILES0 = \
 	effect-handler-general.o \
 	effects.o \
 	effects-info.o \
+	game-difficulty.o \
 	game-event.o \
 	game-input.o \
 	game-world.o \
