@@ -13,6 +13,8 @@
 # slots: min : max                     - number of 'normal' slots to keep stocked
 # normal: type name : item name        - for the normal stocking list
 # always: type name : ?item name       - for things to always stock
+# always-easy: type name : item name   - always stock when easy_stores option is on
+# featured: type name : item name      - rotating featured slot pool (one shown per cycle)
 # buy: type name                       - base types the store will buy
 # buy-flag: flag : type name           - types to buy if the flag is present
 
@@ -23,8 +25,8 @@ owner:5000:Bilbo the Friendly (Hobbit)
 owner:10000:Rincewind the Chicken (Human)
 owner:20000:Snafu the Midget (Gnome)
 owner:30000:Lyar-el the Comely (Elf)
-slots:0:4
-turnover:2
+slots:6:10
+turnover:4
 always:cloak:Cloak
 always:food:Ration of Food
 always:light:Wooden Torch
@@ -34,12 +36,19 @@ always:digger:Pick
 always:shot:Iron Shot
 always:arrow:Arrow
 always:bolt:Bolt
+always-easy:potion:Cure Light Wounds
+always-easy:scroll:Phase Door
+always-easy:scroll:Word of Recall
+always-easy:flask:Flask of Oil
 normal:food:Pint of Fine Wine
 normal:food:Slime Mold
 normal:food:Flask of Whisky
 normal:food:Hard Biscuit
 normal:mushroom:Stoneskin
 normal:mushroom:Purging
+featured:light:Lantern
+featured:cloak:Cloak
+featured:digger:Pick
 buy:light
 buy:food
 buy:mushroom
@@ -76,6 +85,10 @@ normal:gloves:Set of Gauntlets
 normal:shield:Wicker Shield
 normal:shield:Small Metal Shield
 normal:shield:Leather Shield
+featured:boots:Pair of Leather Boots
+featured:helm:Hard Leather Cap
+featured:shield:Leather Shield
+featured:soft armour:Studded Leather Armour
 buy:boots
 buy:gloves
 buy:crown
@@ -122,6 +135,10 @@ normal:bow:Sling
 normal:bow:Short Bow
 normal:bow:Long Bow
 normal:bow:Light Crossbow
+featured:sword:Short Sword
+featured:sword:Broad Sword
+featured:bow:Long Bow
+featured:polearm:Spear
 buy:shot
 buy:bolt
 buy:arrow
@@ -155,12 +172,13 @@ owner:10000:Mauser the Chemist (Half-Elf)
 owner:10000:Wizzle the Chaotic (Hobbit)
 owner:15000:Ga-nat the Greedy (Gnome)
 owner:15000:Vella the Slender (Human)
-slots:6:10
+slots:6:12
 turnover:9
 always:scroll:Word of Recall
 always:scroll:Phase Door
 always:scroll:Remove Curse
 always:potion:Cure Light Wounds
+always-easy:potion:Cure Serious Wounds
 normal:scroll:Monster Confusion
 normal:scroll:Magic Mapping
 normal:scroll:Detect Invisible
@@ -176,6 +194,9 @@ normal:potion:Restore Life Levels
 normal:potion:Neutralize Poison
 normal:potion:Cure Serious Wounds
 normal:potion:Cure Critical Wounds
+featured:potion:Cure Critical Wounds
+featured:potion:Restore Life Levels
+featured:scroll:Recharging
 buy:scroll
 buy:potion
 
@@ -204,6 +225,10 @@ normal:staff:Light
 normal:staff:Mapping
 normal:staff:Detect Invisible
 normal:staff:Detect Evil
+featured:wand:Magic Missile
+featured:wand:Slow Monster
+featured:staff:Teleportation
+featured:ring:Feather Falling
 buy:magic book
 buy:amulet
 buy:ring
@@ -211,14 +236,18 @@ buy:staff
 buy:wand
 buy:rod
 
-# Black Market - no stock given but we still need slot/turnover info
+# Black Market - high turnover, featured slot is the star attraction
 store:STORE_BLACK
 owner:15000:Lo-Hak the Awful (Half-Troll)
 owner:20000:Histor the Goblin (Kobold)
 owner:25000:Durwin the Shifty (Half-Orc)
 owner:30000:Drago the Fair (Elf)
 slots:6:18
-turnover:9
+turnover:12
+featured:potion:Speed
+featured:ring:Protection
+featured:wand:Magic Missile
+featured:scroll:Teleportation
 
 store:HOME
 owner:0:Your home

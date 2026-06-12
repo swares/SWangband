@@ -171,6 +171,13 @@ static struct object *rd_item(void)
 	}
 	rd_byte(&obj->notice);
 
+	/* Living Stores: item stock timestamp (added ITEM_VERSION 6) */
+	if (ver >= 6) {
+		rd_s32b(&obj->stock_turn);
+	} else {
+		obj->stock_turn = 0;
+	}
+
 	for (i = 0; i < of_size; i++)
 		rd_byte(&obj->flags[i]);
 
@@ -1255,6 +1262,16 @@ static int rd_stores_aux(rd_item_t rd_item_version)
 				}
 				object_delete(NULL, NULL, &obj);
 			}
+		}
+
+		/* Living Stores: load cycling timestamps */
+		if (store) {
+			rd_s32b(&store->last_stocked);
+			rd_s32b(&store->last_visit);
+		} else {
+			int32_t dummy;
+			rd_s32b(&dummy);
+			rd_s32b(&dummy);
 		}
 	}
 

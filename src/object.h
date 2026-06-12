@@ -470,6 +470,8 @@ struct object {
 	const struct monster_race *origin_race;	/**< Monster race that dropped it */
 
 	quark_t note; 			/**< Inscription index */
+
+	int32_t stock_turn;		/**< Game turn this entered store stock (0 if not from store) */
 };
 
 /**
@@ -513,6 +515,7 @@ static struct object const OBJECT_NULL = {
 	.origin_depth = 0,
 	.origin_race = NULL,
 	.note = 0,
+	.stock_turn = 0,
 };
 
 struct flavor

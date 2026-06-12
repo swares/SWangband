@@ -133,6 +133,8 @@ static void wr_item(const struct object *obj)
 	}
 	wr_byte(obj->notice);
 
+	wr_s32b(obj->stock_turn);
+
 	for (i = 0; i < OF_SIZE; i++)
 		wr_byte(obj->flags[i]);
 
@@ -761,6 +763,10 @@ void wr_stores(void)
 			wr_item(obj->known);
 			wr_item(obj);
 		}
+
+		/* Living Stores: save cycling timestamps */
+		wr_s32b(store->last_stocked);
+		wr_s32b(store->last_visit);
 	}
 }
 

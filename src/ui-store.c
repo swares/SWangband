@@ -36,6 +36,7 @@
 #include "player-calcs.h"
 #include "player-history.h"
 #include "player-util.h"
+#include "game-world.h"
 #include "store.h"
 #include "target.h"
 #include "ui-display.h"
@@ -293,6 +294,12 @@ static void store_display_entry(struct menu *menu, int oid, bool cursor, int row
 	/* Display the object */
 	c_put_str(obj->kind->base->attr, o_name, row, col);
 
+	/* Living Stores: NEW tag for items stocked after the player's last visit */
+	if (store->feat != FEAT_HOME && store->last_visit > 0 &&
+			obj->stock_turn > store->last_visit) {
+		c_put_str(COLOUR_L_GREEN, "NEW", row, col - 4);
+	}
+
 	/* Show weights */
 	colour = curs_attrs[CURS_KNOWN][(int)cursor];
 	obj_weight = object_weight_one(obj);
@@ -366,6 +373,20 @@ static void store_display_frame(struct store_context *ctx)
 
 		/* Label the asking price (in stores) */
 		put_str("Price", ctx->scr_places_y[LOC_HEADER], ctx->scr_places_x[LOC_PRICE] + 4);
+
+		/* Living Stores: show restock banner if store has cycled since last visit */
+		if (store->last_stocked > store->last_visit && store->last_visit > 0) {
+			int new_count = 0;
+			const struct object *obj;
+			char banner[80];
+			for (obj = store->stock; obj; obj = obj->next)
+				if (obj->stock_turn > store->last_visit) new_count++;
+			if (new_count > 0) {
+				strnfmt(banner, sizeof(banner),
+					"Fresh stock: %d new since your last visit", new_count);
+				c_put_str(COLOUR_L_GREEN, banner, 1, 1);
+			}
+		}
 	}
 }
 
@@ -1317,6 +1338,13 @@ void leave_store(game_event_type type, game_event_data *data, void *user)
 	cmd_disable_repeat();
 
 	sound(MSG_STORE_LEAVE);
+
+	/* Living Stores: stamp last_visit so NEW tags clear on next entry */
+	{
+		struct store *store = store_at(cave, player->grid);
+		if (store && store->feat != FEAT_HOME)
+			store->last_visit = turn;
+	}
 
 	/* Switch back to the normal game view. */
 	event_signal(EVENT_ENTER_WORLD);

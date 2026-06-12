@@ -44,6 +44,156 @@
 #include "debug.h"
 
 
+
+/* Forward declarations needed by Living Stores helpers */
+static void store_delete(struct store *s, struct object *obj, int amt);
+static struct object *store_find_kind(struct store *s, struct object_kind *k,
+		bool (*mechanism)(struct store *, struct object *));
+static struct object *store_create_item(struct store *store,
+		struct object_kind *kind);
+static bool store_sale_should_reduce_stock(struct store *store,
+		struct object *obj);
+
+/* -----------------------------------------------------------------------
+ * Living Stores helpers
+ * ----------------------------------------------------------------------- */
+
+#define STORE_CHURN_PCT 40  /* min % of luxury (non-always) items retired per cycle */
+
+/**
+ * Return true if obj's kind is a staple (always: or, if easy_stores is on,
+ * always-easy:) for store s.
+ */
+static bool store_obj_is_staple(const struct store *s, const struct object *obj)
+{
+	size_t i;
+	for (i = 0; i < s->always_num; i++)
+		if (s->always_table[i] == obj->kind) return true;
+	if (player && OPT(player, easy_stores))
+		for (i = 0; i < s->always_easy_num; i++)
+			if (s->always_easy_table[i] == obj->kind) return true;
+	return false;
+}
+
+/**
+ * Count non-staple items currently in stock.
+ */
+static int store_luxury_count(const struct store *s)
+{
+	int count = 0;
+	const struct object *obj;
+	for (obj = s->stock; obj; obj = obj->next)
+		if (!store_obj_is_staple(s, obj)) count++;
+	return count;
+}
+
+/**
+ * Delete one random non-staple item from the store.
+ */
+static void store_delete_random_luxury(struct store *s)
+{
+	int luxuries = store_luxury_count(s);
+	int what, n;
+	struct object *obj;
+
+	if (!luxuries) return;
+
+	what = randint0(luxuries);
+	n = 0;
+	for (obj = s->stock; obj; obj = obj->next) {
+		if (store_obj_is_staple(s, obj)) continue;
+		if (n++ == what) break;
+	}
+	if (obj) {
+		int num = randint1(obj->number);
+		store_delete(s, obj, num);
+	}
+}
+
+/**
+ * Stock all always: staples to a full stack.
+ */
+static void store_stock_always(struct store *s)
+{
+	size_t i;
+	for (i = 0; i < s->always_num; i++) {
+		struct object_kind *kind = s->always_table[i];
+		struct object *obj = store_find_kind(s, kind, store_sale_should_reduce_stock);
+		if (!obj) {
+			obj = store_create_item(s, kind);
+			if (!obj) continue;
+			obj->stock_turn = turn;
+			if (obj->known) obj->known->stock_turn = turn;
+		}
+		obj->number = obj->kind->base->max_stack;
+		obj->known->number = obj->kind->base->max_stack;
+	}
+}
+
+/**
+ * Stock all always-easy: staples (only when easy_stores option is on).
+ */
+static void store_stock_always_easy(struct store *s)
+{
+	size_t i;
+	for (i = 0; i < s->always_easy_num; i++) {
+		struct object_kind *kind = s->always_easy_table[i];
+		struct object *obj = store_find_kind(s, kind, store_sale_should_reduce_stock);
+		if (!obj) {
+			obj = store_create_item(s, kind);
+			if (!obj) continue;
+			obj->stock_turn = turn;
+			if (obj->known) obj->known->stock_turn = turn;
+		}
+		obj->number = obj->kind->base->max_stack;
+		obj->known->number = obj->kind->base->max_stack;
+	}
+}
+
+/**
+ * Rotate the featured slot: pick a new item from the featured pool (different
+ * from the current one if possible) and ensure one is in stock.
+ */
+static void store_rotate_featured(struct store *s)
+{
+	struct object *obj;
+	int new_idx, tries;
+
+	if (!s->featured_num) return;
+
+	/* Remove the previous featured item from stock (if still there) */
+	if (s->featured_current >= 0) {
+		struct object_kind *old_kind = s->featured_table[s->featured_current];
+		for (obj = s->stock; obj; obj = obj->next) {
+			if (obj->kind == old_kind && !store_obj_is_staple(s, obj)) {
+				store_delete(s, obj, obj->number);
+				break;
+			}
+		}
+	}
+
+	/* Pick a different featured kind if we have more than one */
+	new_idx = s->featured_current;
+	for (tries = 0; tries < 10 && new_idx == s->featured_current; tries++)
+		new_idx = randint0(s->featured_num);
+	s->featured_current = new_idx;
+
+	/* Stock it (one copy) */
+	{
+		struct object_kind *kind = s->featured_table[s->featured_current];
+		obj = store_find_kind(s, kind, store_sale_should_reduce_stock);
+		if (!obj) {
+			obj = store_create_item(s, kind);
+			if (obj) {
+				obj->stock_turn = turn;
+				if (obj->known) obj->known->stock_turn = turn;
+			}
+		}
+	}
+}
+
+/* End Living Stores helpers */
+
 static void store_maint(struct store *s);
 
 /**
@@ -104,6 +254,8 @@ static void cleanup_stores(void)
 		object_pile_free(NULL, NULL, store->stock_k);
 		object_pile_free(NULL, NULL, store->stock);
 		mem_free(store->always_table);
+		mem_free(store->always_easy_table);
+		mem_free(store->featured_table);
 		mem_free(store->normal_table);
 
 		for (o = store->owners; o; o = o_next) {
@@ -233,6 +385,51 @@ static enum parser_error parse_always(struct parser *p) {
 	return PARSE_ERROR_NONE;
 }
 
+static enum parser_error parse_always_easy(struct parser *p) {
+	struct store *s = parser_priv(p);
+	int tval = tval_find_idx(parser_getsym(p, "tval"));
+	int sval = lookup_sval(tval, parser_getsym(p, "sval"));
+	struct object_kind *kind = lookup_kind(tval, sval);
+
+	if (!kind)
+		return PARSE_ERROR_UNRECOGNISED_SVAL;
+
+	/* Expand if necessary */
+	if (!s->always_easy_num) {
+		s->always_easy_size = 8;
+		s->always_easy_table = mem_zalloc(s->always_easy_size * sizeof *s->always_easy_table);
+	} else if (s->always_easy_num >= s->always_easy_size) {
+		s->always_easy_size += 8;
+		s->always_easy_table = mem_realloc(s->always_easy_table,
+			s->always_easy_size * sizeof *s->always_easy_table);
+	}
+	s->always_easy_table[s->always_easy_num++] = kind;
+	return PARSE_ERROR_NONE;
+}
+
+static enum parser_error parse_featured(struct parser *p) {
+	struct store *s = parser_priv(p);
+	int tval = tval_find_idx(parser_getsym(p, "tval"));
+	int sval = lookup_sval(tval, parser_getsym(p, "sval"));
+	struct object_kind *kind = lookup_kind(tval, sval);
+
+	if (!kind)
+		return PARSE_ERROR_UNRECOGNISED_SVAL;
+
+	/* Expand if necessary */
+	if (!s->featured_num) {
+		s->featured_size = 8;
+		s->featured_table = mem_zalloc(s->featured_size * sizeof *s->featured_table);
+	} else if (s->featured_num >= s->featured_size) {
+		s->featured_size += 8;
+		s->featured_table = mem_realloc(s->featured_table,
+			s->featured_size * sizeof *s->featured_table);
+	}
+	s->featured_table[s->featured_num++] = kind;
+	return PARSE_ERROR_NONE;
+}
+
+
 static enum parser_error parse_owner(struct parser *p) {
 	struct store *s = parser_priv(p);
 	unsigned int maxcost = parser_getuint(p, "purse");
@@ -297,6 +494,8 @@ struct parser *init_parse_stores(void) {
 	parser_reg(p, "turnover uint turnover", parse_turnover);
 	parser_reg(p, "normal sym tval sym sval", parse_normal);
 	parser_reg(p, "always sym tval ?sym sval", parse_always);
+	parser_reg(p, "always-easy sym tval sym sval", parse_always_easy);
+	parser_reg(p, "featured sym tval sym sval", parse_featured);
 	parser_reg(p, "buy str base", parse_buy);
 	parser_reg(p, "buy-flag sym flag str base", parse_buy_flag);
 	/*
@@ -349,6 +548,9 @@ void store_reset(void) {
 		object_pile_free(NULL, NULL, s->stock);
 		s->stock_k = NULL;
 		s->stock = NULL;
+		s->featured_current = -1;
+		s->last_stocked = 0;
+		s->last_visit = 0;
 		if (s->feat == FEAT_HOME)
 			continue;
 		for (j = 0; j < 10; j++)
@@ -645,9 +847,12 @@ int price_item(struct store *store, const struct object *obj,
 			price = object_value_real(obj, 1);
 		}
 
-		/* Black market sucks */
+		/* Black market sucks — soften markup under easy_stores */
 		if (store->feat == FEAT_STORE_BLACK) {
-			price = price * 2;
+			if (player && OPT(player, easy_stores))
+				price = price * 3 / 2;  /* 50% markup (vs 100% normally) */
+			else
+				price = price * 2;
 		}
 	}
 
@@ -1313,107 +1518,80 @@ static void store_maint(struct store *s)
 		}
 	}
 
-	/* We want to make sure stores have staple items. If there's
-	 * turnover, we also want to delete a few items, and add a few
-	 * items.
+	/* ---------------------------------------------------------------
+	 * Living Stores rewrite of the restock loop.
 	 *
-	 * If we create staple items, then delete items, then create new
-	 * items, we are stuck with one of three choices:
-	 * 1. We can risk deleting staple items, and not having any left.
-	 * 2. We can refuse to delete staple items, and risk having that
-	 * become an infinite loop.
-	 * 3. We can do a ton of extra bookkeeping to make sure we delete
-	 * staple items only if there's duplicates of them.
-	 *
-	 * What if we change the order? First sell a handful of random items,
-	 * then create any missing staples, then create new items. This
-	 * has two tests for s->turnover, but simplifies everything else
-	 * dramatically.
-	 */
+	 * Order: churn luxuries first (guaranteed minimum), then pin
+	 * staples, then top up with fresh normals, then rotate featured.
+	 * This keeps staples reliable while making luxury stock visibly
+	 * cycle every visit.
+	 * --------------------------------------------------------------- */
 
 	if (s->turnover) {
+		/* PILLAR B — forced churn: retire a guaranteed share of the
+		 * non-staple (luxury) pool so a revisit always looks different. */
+		int luxuries = store_luxury_count(s);
+		int churn = MAX(1, luxuries * STORE_CHURN_PCT / 100);
 		int restock_attempts = 100000;
-		int stock = s->stock_num - randint1(s->turnover);
 
-		/* We'll end up adding staples for sure, maybe plus other
-		 * items. It's fine if we sell out completely, though, if
-		 * turnover is high. The cap doesn't include always_num,
-		 * because otherwise the addition of missing staples could
-		 * put us over (if the store was full of player-sold loot).
-		 */
-		int min = 0;
-		int max = s->normal_stock_max;
-
-		if (stock < min) stock = min;
-		if (stock > max) stock = max;
-
-		/* Destroy random objects until only "stock" slots are left */
-		while (s->stock_num > stock && --restock_attempts)
-			store_delete_random(s);
-
+		while (churn > 0 && store_luxury_count(s) > 0 && --restock_attempts) {
+			store_delete_random_luxury(s);
+			churn--;
+		}
 		if (!restock_attempts)
 			quit_fmt("Unable to (de-)stock %s. Please report this bug",
 				(f_info[s->feat].name) ? f_info[s->feat].name :
 				format("store %d", f_info[s->feat].shopnum));
 	} else {
-		/* For the Bookseller, occasionally sell a book */
+		/* Bookseller: occasionally sell a book (vanilla behaviour) */
 		if (s->always_num && s->stock_num) {
 			int sales = randint1(s->stock_num);
-			while (sales--) {
+			while (sales--)
 				store_delete_random(s);
-			}
 		}
 	}
 
-	/* Ensure staples are created */
-	if (s->always_num) {
-		size_t i;
-		for (i = 0; i < s->always_num; i++) {
-			struct object_kind *kind = s->always_table[i];
-			struct object *obj = store_find_kind(s, kind,
-				store_sale_should_reduce_stock);
+	/* PILLAR A — pin staples: always: items are always in stock */
+	store_stock_always(s);
 
-			/* Create the item if it doesn't exist */
-			if (!obj) {
-				obj = store_create_item(s, kind);
-				if (!obj) continue;
-			}
+	/* PILLAR A (gated) — easy_stores survival staples */
+	if (player && OPT(player, easy_stores))
+		store_stock_always_easy(s);
 
-			/* Ensure a full stack */
-			obj->number = obj->kind->base->max_stack;
-			obj->known->number = obj->kind->base->max_stack;
-		}
-	}
-
+	/* Refill luxury slots up to the normal slot target */
 	if (s->turnover) {
 		int restock_attempts = 100000;
+		int easy_num = (player && OPT(player, easy_stores)) ?
+			(int)s->always_easy_num : 0;
 		int stock = s->stock_num + randint1(s->turnover);
+		int min = s->normal_stock_min + (int)s->always_num + easy_num;
+		int max = s->normal_stock_max + (int)s->always_num + easy_num;
 
-		/* Now that the staples exist, we want to add more
-		 * items, at least enough to get us to normal_stock_min
-		 * items that aren't necessarily staples.
-		 */
-
-		int min = s->normal_stock_min + s->always_num;
-		int max = s->normal_stock_max + s->always_num;
-
-		/* Buy a few items */
-
-		/* Keep stock between specified min and max slots */
 		if (stock > max) stock = max;
 		if (stock < min) stock = min;
 
-		/* For the rest, we just choose items randomlyish */
-		/* The (huge) restock_attempts will only go to zero (otherwise
-		 * infinite loop) if stores don't have enough items they can stock! */
-		while (s->stock_num < stock && --restock_attempts)
-			store_create_random(s);
-
+		while (s->stock_num < stock && --restock_attempts) {
+			/* Tag newly created items with the current turn */
+			if (store_create_random(s)) {
+				struct object *obj = s->stock;
+				if (obj && obj->stock_turn == 0) {
+					obj->stock_turn = turn;
+					if (obj->known) obj->known->stock_turn = turn;
+				}
+			}
+		}
 		if (!restock_attempts)
 			quit_fmt("Unable to (re-)stock %s. Please report this bug",
 				(f_info[s->feat].name) ? f_info[s->feat].name :
 				format("store %d", f_info[s->feat].shopnum));
 	}
+
+	/* PILLAR B — rotate the featured slot */
+	if (s->featured_num)
+		store_rotate_featured(s);
+
+	/* Stamp the maintenance turn */
+	s->last_stocked = turn;
 }
 
 /**

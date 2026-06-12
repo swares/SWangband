@@ -64,6 +64,21 @@ struct store {
 	int turnover;
 	int normal_stock_min;
 	int normal_stock_max;
+
+	/* Living Stores — Pillar A: easy_stores-gated staples */
+	size_t always_easy_size;
+	size_t always_easy_num;
+	struct object_kind **always_easy_table;
+
+	/* Living Stores — Pillar B: rotating featured slot */
+	size_t featured_size;
+	size_t featured_num;
+	struct object_kind **featured_table;
+	int featured_current;		/* index of kind currently in featured slot (-1 = none) */
+
+	/* Living Stores — cycling timestamps */
+	int32_t last_stocked;		/* game turn of last store_maint() */
+	int32_t last_visit;		/* game turn player last browsed */
 };
 
 extern struct store *stores;
