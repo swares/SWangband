@@ -19,6 +19,7 @@
  */
 
 #include "angband.h"
+#include "threat.h"
 #include "cave.h"
 #include "game-event.h"
 #include "game-input.h"
@@ -2707,6 +2708,18 @@ void redraw_stuff(struct player *p)
 	if (redraw & PR_MAP) {
 		/* Mark the whole map to be redrawn */
 		event_signal_point(EVENT_MAP, -1, -1);
+	}
+
+	/* HP or visible-monster changes make the threat read stale */
+	if (p->upkeep->redraw & (PR_HP | PR_MONLIST))
+		p->upkeep->redraw |= PR_THREAT;
+
+	if (p->upkeep->redraw & PR_THREAT) {
+		p->upkeep->redraw &= ~PR_THREAT;
+		if (OPT(p, show_threat_meter)) {
+			threat_assess(p, cave, &p->upkeep->threat);
+			event_signal(EVENT_THREAT);
+		}
 	}
 
 	p->upkeep->redraw &= ~redraw;

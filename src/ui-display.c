@@ -18,6 +18,7 @@
  */
 
 #include "angband.h"
+#include "threat.h"
 #include "buildid.h"
 #include "cave.h"
 #include "cmd-core.h"
@@ -81,6 +82,7 @@ static game_event_type player_events[] =
 
 	EVENT_PLAYERSPEED,
 	EVENT_DUNGEONLEVEL,
+	EVENT_THREAT,
 };
 
 static game_event_type statusline_events[] =
@@ -853,6 +855,41 @@ static const struct side_handler_t
  * important lower numbers.  As the screen gets smaller, the rows start to
  * disappear in the order of lowest to highest importance.
  */
+
+/**
+ * Print the threat meter on the sidebar.
+ * Shows a coloured tier label and the escape item name if ready.
+ */
+static void prt_threat_meter(int row, int col)
+{
+	static const struct {
+		uint8_t attr;
+		const char *label;
+	} tier_info[] = {
+		{ COLOUR_L_GREEN, "SAFE  " },
+		{ COLOUR_YELLOW,  "CAUTION"},
+		{ COLOUR_ORANGE,  "DANGER "},
+		{ COLOUR_L_RED,   "LETHAL "},
+	};
+	const struct threat_summary *t = &player->upkeep->threat;
+	enum threat_tier tier = t->tier;
+	char buf[32];
+
+	if (player->timed[TMD_IMAGE]) {
+		c_put_str(COLOUR_VIOLET, "THREAT:  ???   ", row, col);
+		return;
+	}
+
+	strnfmt(buf, sizeof(buf), "%-7s", tier_info[tier].label);
+	c_put_str(tier_info[tier].attr, buf, row, col);
+
+	if (t->escape_ready && t->escape_name) {
+		char esc[20];
+		strnfmt(esc, sizeof(esc), "[%s]", t->escape_name);
+		c_put_str(COLOUR_L_BLUE, esc, row + 1, col);
+	}
+}
+
 static void update_sidebar(game_event_type type, game_event_data *data,
 						   void *user)
 {
@@ -2113,6 +2150,8 @@ static void update_player_compact_subwindow(game_event_type type,
 	/* Second Wind charge indicator (when feature is live and charged) */
 	if (OPT(player, birth_second_wind))
 		prt_second_wind(row++, col);
+	if (OPT(player, show_threat_meter))
+		prt_threat_meter(row, col);
 
 	/* Spellpoints */
 	prt_sp(row++, col);

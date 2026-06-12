@@ -444,6 +444,50 @@ struct player_state {
  *
  * XXX Some of these probably should go to the UI
  */
+
+/* -----------------------------------------------------------------------
+ * Threat telemetry types (defined here to avoid circular includes with
+ * threat.h, which itself includes player.h).
+ * ----------------------------------------------------------------------- */
+enum threat_tier {
+	THREAT_CLEAR   = 0,
+	THREAT_CAUTION = 1,
+	THREAT_DANGER  = 2,
+	THREAT_LETHAL  = 3
+};
+
+enum {
+	TF_OOD        = 0x0001,
+	TF_FAST       = 0x0002,
+	TF_BREATH     = 0x0004,
+	TF_SUMMONS    = 0x0008,
+	TF_BREEDS     = 0x0010,
+	TF_RANGED     = 0x0020,
+	TF_DRAIN_XP   = 0x0040,
+	TF_DRAIN_STAT = 0x0080,
+	TF_UNIQUE     = 0x0100
+};
+
+struct threat_foe {
+	const struct monster *mon;
+	int dpt;
+	int ttk;
+	int ood;
+	uint16_t flags;
+	bool certain;
+};
+
+#define THREAT_MAX_FOES 12
+
+struct threat_summary {
+	enum threat_tier tier;
+	int n;
+	struct threat_foe foe[THREAT_MAX_FOES];
+	int dot_ttk;
+	bool escape_ready;
+	const char *escape_name;
+};
+
 struct player_upkeep {
 	bool playing;			/* True if player is playing */
 	bool autosave;			/* True if autosave is pending */
@@ -455,6 +499,7 @@ struct player_upkeep {
 	int new_spells;			/* Number of spells available */
 
 	struct monster *health_who;			/* Health bar trackee */
+	struct threat_summary threat;		/* Cached danger telemetry (see threat.h) */
 	struct monster_race *monster_race;	/* Monster race trackee */
 	struct object *object;				/* Object trackee */
 	struct object_kind *object_kind;	/* Object kind trackee */

@@ -74,6 +74,7 @@
 #define PR_ITEMLIST		0x00800000L /* Display item list */
 #define PR_FEELING		0x01000000L /* Display level feeling */
 #define PR_LIGHT		0x02000000L /* Display light level */
+#define PR_THREAT		0x04000000L /* Recompute & redraw the threat meter */
 
 /**
  * Display Basic Info

@@ -253,6 +253,7 @@ ANGFILES0 = \
 	sound-core.o \
 	source.o \
 	store.o \
+	threat.o \
 	target.o \
 	trap.o \
 	ui-birth.o \
