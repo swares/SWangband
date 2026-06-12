@@ -475,6 +475,9 @@ void wr_player(void)
 	wr_s16b(player->chp);
 	wr_u16b(player->chp_frac);
 
+	/* Second Wind soft-death charges */
+	wr_s16b(player->second_wind);
+
 	wr_s16b(player->msp);
 	wr_s16b(player->csp);
 	wr_u16b(player->csp_frac);

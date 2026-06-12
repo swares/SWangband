@@ -33,6 +33,7 @@
 #include "obj-util.h"
 #include "player-attack.h"
 #include "player-calcs.h"
+#include "effects.h"
 #include "player-history.h"
 #include "player-quest.h"
 #include "player-spell.h"
@@ -194,6 +195,63 @@ int player_apply_damage_reduction(struct player *p, int dam)
  * when he dies, since the "You die." message is shown before setting
  * the player to "dead".
  */
+
+#define SECOND_WIND_HEAL_NUM  1   /* numerator   -- heal (NUM/DEN) * mhp */
+#define SECOND_WIND_HEAL_DEN  2   /* denominator */
+#define SECOND_WIND_WARD_TURNS 12 /* turns of TMD_BLESSED grace window */
+#define SECOND_WIND_ASCEND    1   /* levels to ascend (normal characters) */
+#define SECOND_WIND_BLINK_RANGE 200 /* teleport range for ironman/town */
+
+/**
+ * Attempt to spend a "second wind" charge to survive a killing blow.
+ *
+ * Returns true if the player survives (caller should treat the hit as
+ * survived); false if no charge was available and normal death proceeds.
+ */
+static bool player_apply_second_wind(struct player *p)
+{
+	/* Feature must be enabled and a charge must remain */
+	if (!OPT(p, birth_second_wind)) return false;
+	if (p->second_wind <= 0) return false;
+
+	/* Spend the charge */
+	p->second_wind--;
+
+	/* Restore half (or configured fraction) of max HP */
+	p->chp = p->mhp * SECOND_WIND_HEAL_NUM / SECOND_WIND_HEAL_DEN;
+	p->chp_frac = 0;
+
+	/* Clear the conditions most likely to chain into a second death */
+	player_clear_timed(p, TMD_POISONED, true, false);
+	player_clear_timed(p, TMD_CUT, true, false);
+	player_clear_timed(p, TMD_STUN, true, false);
+	player_clear_timed(p, TMD_CONFUSED, true, false);
+	player_clear_timed(p, TMD_AFRAID, true, false);
+
+	/* Brief blessed grace window to actually escape */
+	player_set_timed(p, TMD_BLESSED, SECOND_WIND_WARD_TURNS, true, false);
+
+	/* Announce loudly — drives sound.prf and Android haptic via MSG type */
+	msgt(MSG_SECOND_WIND,
+		"As the killing blow lands, a second wind tears you free!");
+	history_add(p, "Cheated death with a second wind", HIST_GENERIC);
+
+	/* Redraw HP and sidebar */
+	p->upkeep->redraw |= (PR_HP | PR_MISC);
+
+	/* Relocate to safety.
+	 * Force-descend/ironman can't ascend; town has no level above it.
+	 * In those cases, blink in place instead. */
+	if (OPT(p, birth_force_descend) || p->depth <= 0) {
+		effect_simple(EF_TELEPORT, source_player(),
+			"200", 0, 0, 0, 0, 0, NULL);
+	} else {
+		dungeon_change_level(p, MAX(0, p->depth - SECOND_WIND_ASCEND));
+	}
+
+	return true;
+}
+
 void take_hit(struct player *p, int dam, const char *kb_str)
 {
 	int old_chp = p->chp;
@@ -236,6 +294,9 @@ void take_hit(struct player *p, int dam, const char *kb_str)
 				msg("'The Mormegil cannot be slain, save by mischance.'");
 			}
 		} else {
+			/* Second Wind: intercept the killing blow before recording death */
+			if (player_apply_second_wind(p)) return;
+
 			/*
 			 * Note cause of death.  Do it here so EVENT_CHEAT_DEATH
 			 * handlers or things looking for the "Die? " prompt

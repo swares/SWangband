@@ -325,6 +325,18 @@ static void prt_hp(int row, int col)
 	c_put_str(COLOUR_WHITE, "/", row, col + 7);
 	c_put_str(COLOUR_L_GREEN, max_hp, row, col + 8);
 }
+/**
+ * Print the player's Second Wind charges on the sidebar.
+ * Only shown when birth_second_wind is on and at least one charge remains.
+ */
+static void prt_second_wind(int row, int col)
+{
+	char buf[32];
+	strnfmt(buf, sizeof(buf), "Wind:%2d", player->second_wind);
+	c_put_str(COLOUR_YELLOW, buf, row, col);
+}
+
+
 
 /**
  * Prints players max/cur spell points
@@ -2097,6 +2109,10 @@ static void update_player_compact_subwindow(game_event_type type,
 
 	/* Hitpoints */
 	prt_hp(row++, col);
+
+	/* Second Wind charge indicator (when feature is live and charged) */
+	if (OPT(player, birth_second_wind))
+		prt_second_wind(row++, col);
 
 	/* Spellpoints */
 	prt_sp(row++, col);

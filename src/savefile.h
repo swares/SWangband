@@ -91,6 +91,7 @@ int rd_object_memory(void);
 int rd_quests(void);
 int rd_artifacts(void);
 int rd_player(void);
+int rd_player_v2(void);
 int rd_ignore(void);
 int rd_misc(void);
 int rd_player_hp(void);

@@ -536,6 +536,8 @@ struct player {
 	int16_t chp;		/* Cur hit pts */
 	uint16_t chp_frac;	/* Cur hit frac (times 2^16) */
 
+	int16_t second_wind;	/* Soft-death charges remaining (0 = spent/off) */
+
 	int16_t msp;		/* Max mana pts */
 	int16_t csp;		/* Cur mana pts */
 	uint16_t csp_frac;	/* Cur mana frac (times 2^16) */
