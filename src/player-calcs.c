@@ -2716,7 +2716,7 @@ void redraw_stuff(struct player *p)
 
 	if (p->upkeep->redraw & PR_THREAT) {
 		p->upkeep->redraw &= ~PR_THREAT;
-		if (OPT(p, show_threat_meter)) {
+		if (OPT(p, show_threat_meter) && cave) {
 			threat_assess(p, cave, &p->upkeep->threat);
 			event_signal(EVENT_THREAT);
 		}

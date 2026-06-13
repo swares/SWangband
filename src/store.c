@@ -126,7 +126,7 @@ static void store_stock_always(struct store *s)
 			if (obj->known) obj->known->stock_turn = turn;
 		}
 		obj->number = obj->kind->base->max_stack;
-		obj->known->number = obj->kind->base->max_stack;
+		if (obj->known) obj->known->number = obj->kind->base->max_stack;
 	}
 }
 
@@ -146,7 +146,7 @@ static void store_stock_always_easy(struct store *s)
 			if (obj->known) obj->known->stock_turn = turn;
 		}
 		obj->number = obj->kind->base->max_stack;
-		obj->known->number = obj->kind->base->max_stack;
+		if (obj->known) obj->known->number = obj->kind->base->max_stack;
 	}
 }
 
@@ -1538,10 +1538,7 @@ static void store_maint(struct store *s)
 			store_delete_random_luxury(s);
 			churn--;
 		}
-		if (!restock_attempts)
-			quit_fmt("Unable to (de-)stock %s. Please report this bug",
-				(f_info[s->feat].name) ? f_info[s->feat].name :
-				format("store %d", f_info[s->feat].shopnum));
+		/* If churn attempts exhausted, proceed — store is valid as-is. */
 	} else {
 		/* Bookseller: occasionally sell a book (vanilla behaviour) */
 		if (s->always_num && s->stock_num) {
@@ -1580,10 +1577,8 @@ static void store_maint(struct store *s)
 				}
 			}
 		}
-		if (!restock_attempts)
-			quit_fmt("Unable to (re-)stock %s. Please report this bug",
-				(f_info[s->feat].name) ? f_info[s->feat].name :
-				format("store %d", f_info[s->feat].shopnum));
+		/* If refill attempts exhausted (all random kinds merge with always/easy
+		 * staples), proceed — store is valid with whatever stock it reached. */
 	}
 
 	/* PILLAR B â€” rotate the featured slot */

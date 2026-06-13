@@ -334,6 +334,8 @@ static void prt_hp(int row, int col)
 static void prt_second_wind(int row, int col)
 {
 	char buf[32];
+	if (!character_generated || !player->upkeep) return;
+	if (!OPT(player, birth_second_wind) || player->second_wind <= 0) { put_str("        ", row, col); return; }
 	strnfmt(buf, sizeof(buf), "Wind:%2d", player->second_wind);
 	c_put_str(COLOUR_YELLOW, buf, row, col);
 }
@@ -816,6 +818,10 @@ static void update_topbar(game_event_type type, game_event_data *data,
 /**
  * Struct of sidebar handlers.
  */
+static void prt_threat_meter(int row, int col);  /* forward decl */
+
+static void prt_threat_meter(int row, int col);  /* forward decl */
+
 static const struct side_handler_t
 {
 	void (*hook)(int, int);	 /* int row, int col */
@@ -838,10 +844,10 @@ static const struct side_handler_t
 	{ prt_ac,       7, EVENT_AC },
 	{ prt_hp,       8, EVENT_HP },
 	{ prt_sp,       9, EVENT_MANA },
-	{ NULL,        21, 0 },
+	{ prt_second_wind, 21, EVENT_HP },
 	{ prt_health,  12, EVENT_MONSTERHEALTH },
 	{ NULL,        20, 0 },
-	{ NULL,        22, 0 },
+	{ prt_threat_meter, 20, EVENT_THREAT },
 	{ prt_speed,   13, EVENT_PLAYERSPEED }, /* Slow (-NN) / Fast (+NN) */
 	{ prt_depth,   14, EVENT_DUNGEONLEVEL }, /* Lev NNN / NNNN ft */
 };
@@ -862,6 +868,8 @@ static const struct side_handler_t
  */
 static void prt_threat_meter(int row, int col)
 {
+	if (!character_generated || !player->upkeep) return;
+	if (!OPT(player, show_threat_meter)) { put_str("        ", row, col); return; }
 	static const struct {
 		uint8_t attr;
 		const char *label;
@@ -873,6 +881,7 @@ static void prt_threat_meter(int row, int col)
 	};
 	const struct threat_summary *t = &player->upkeep->threat;
 	enum threat_tier tier = t->tier;
+	if ((int)tier < 0 || (int)tier >= 4) tier = THREAT_CLEAR;
 	char buf[32];
 
 	if (player->timed[TMD_IMAGE]) {
@@ -883,11 +892,7 @@ static void prt_threat_meter(int row, int col)
 	strnfmt(buf, sizeof(buf), "%-7s", tier_info[tier].label);
 	c_put_str(tier_info[tier].attr, buf, row, col);
 
-	if (t->escape_ready && t->escape_name) {
-		char esc[20];
-		strnfmt(esc, sizeof(esc), "[%s]", t->escape_name);
-		c_put_str(COLOUR_L_BLUE, esc, row + 1, col);
-	}
+	/* escape sub-row display suppressed — row+1 conflicts with other sidebar entries */
 }
 
 static void update_sidebar(game_event_type type, game_event_data *data,
@@ -2151,7 +2156,7 @@ static void update_player_compact_subwindow(game_event_type type,
 	if (OPT(player, birth_second_wind))
 		prt_second_wind(row++, col);
 	if (OPT(player, show_threat_meter))
-		prt_threat_meter(row, col);
+		prt_threat_meter(row++, col);
 
 	/* Spellpoints */
 	prt_sp(row++, col);
@@ -2775,15 +2780,20 @@ static void ui_enter_world(game_event_type type, game_event_data *data,
 {
 	/* Allow big cursor */
 	smlcurs = false;
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "EW 1:after_smlcurs\n"); fclose(_d); } }
 
 	/* Redraw stuff */
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "EW 1b: redraw_before=0x%x\n", player->upkeep->redraw); fclose(_d); } }
 	player->upkeep->redraw |= (PR_INVEN | PR_EQUIP | PR_MONSTER | PR_MESSAGE);
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "EW 1c: redraw_after=0x%x\n", player->upkeep->redraw); fclose(_d); } }
 	redraw_stuff(player);
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "EW 2:after_redraw\n"); fclose(_d); } }
 
 	/* Because of the "flexible" sidebar, all these things trigger
 	   the same function. */
 	event_add_handler_set(player_events, N_ELEMENTS(player_events),
 			      update_sidebar, NULL);
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "EW 3:after_sidebar_reg\n"); fclose(_d); } }
 
 	/* The flexible statusbar has similar requirements, so is
 	   also trigger by a large set of events. */

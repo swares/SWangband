@@ -1232,6 +1232,7 @@ void do_cmd_choose_history(struct command *cmd)
 
 void do_cmd_accept_character(struct command *cmd)
 {
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT A: do_cmd_accept_character start\n"); fclose(_d); } }
 	options_init_cheat();
 
 	roll_hp();
@@ -1269,6 +1270,7 @@ void do_cmd_accept_character(struct command *cmd)
 
 	/* Initialise the stores, dungeon */
 	store_reset();
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT B: after store_reset\n"); fclose(_d); } }
 	chunk_list_max = 0;
 
 	/* Player learns innate runes */

@@ -1001,6 +1001,7 @@ void process_player(void)
  */
 void on_new_level(void)
 {
+	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT G: on_new_level\n"); fclose(_d); } }
 	/* Arena levels are not really a level change */
 	if (!player->upkeep->arena_level) {
 		/* Play ambient sound on change of level. */
