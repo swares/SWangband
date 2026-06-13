@@ -184,6 +184,7 @@ add_library(OurCoreLib OBJECT
         src/effect-handler-general.c
         src/effects.c
         src/effects-info.c
+        src/game-difficulty.c
         src/game-event.c
         src/game-input.c
         src/game-world.c
@@ -259,6 +260,7 @@ add_library(OurCoreLib OBJECT
         src/sound-core.c
         src/source.c
         src/store.c
+        src/threat.c
         src/target.c
         src/trap.c
         src/ui-birth.c
