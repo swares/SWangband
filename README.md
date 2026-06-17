@@ -21,11 +21,24 @@ available, blank when spent). Enable or disable this at character creation
 with the **Second Wind** birth option.
 
 ### Difficulty Presets
-At character creation you can choose a difficulty preset that adjusts
-multiple challenge parameters at once — monster speed, item quality, and
-experience penalties. Presets range from Apprentice (forgiving) to
-Ironman (brutal). These are birth options and cannot be changed after
-the game begins.
+The first thing you see when starting a new game is a preset picker. Choose
+one of three presets to configure Second Wind, Danger Telemetry, and economy
+settings in one step. You can still tweak individual options afterwards.
+
+| Preset | Second Wind | Threat meter | Economy | Death |
+|--------|-------------|--------------|---------|-------|
+| **Wanderer** | 3 charges | On | No selling (generous gold drops) | Second chances |
+| **Adventurer** *(recommended)* | 1 charge | On | Standard | Second chance |
+| **Legend** | None | Off | Standard | Permadeath |
+
+**Wanderer** is aimed at first-timers: three second chances, a visible danger
+readout, and a no-selling economy where gold comes from drops rather than
+shops, so you always have enough to buy what you need.
+
+**Adventurer** is the intended experience: one second chance and the threat
+meter on, standard gold economy.
+
+**Legend** is vanilla permadeath — no safety net, no threat warnings, one life.
 
 ### Danger Telemetry
 A threat meter appears in the sidebar showing the danger level of monsters
