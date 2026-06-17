@@ -746,24 +746,18 @@ static bool start_game(bool new_game)
 		update_player_object_knowledge(player);
 	}
 
-	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT C: before EVENT_LEAVE_INIT\n"); fclose(_d); } }
 	/* Tell the UI we've started. */
 	event_signal(EVENT_LEAVE_INIT);
 	event_signal(EVENT_ENTER_GAME);
-	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT D: before EVENT_ENTER_WORLD\n"); fclose(_d); } }
 	event_signal(EVENT_ENTER_WORLD);
-	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT E: after EVENT_ENTER_WORLD\n"); fclose(_d); } }
 
 	/* Save not required yet. */
 	player->upkeep->autosave = false;
 
 	/* Enter the level, generating a new one if needed */
-	{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT F: before prepare_next_level\n"); fclose(_d); } }
 	if (!character_dungeon) {
-		{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT F2: inside prepare_next_level branch\n"); fclose(_d); } }
-		prepare_next_level(player);
-		{ FILE *_d = fopen("C:/msys64/home/wares/swangband_debug.txt", "a"); if (_d) { fprintf(_d, "CHECKPOINT F3: after prepare_next_level\n"); fclose(_d); } }
-	}
+			prepare_next_level(player);
+		}
 	on_new_level();
 
 	return true;

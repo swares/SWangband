@@ -342,7 +342,7 @@ static void list_saves(void)
 int main(int argc, char *argv[])
 {
 	int i;
-	bool new_game = false, select_game = false;
+	bool new_game = false;
 	bool done = false;
 
 	const char *mstr = NULL;
@@ -388,7 +388,6 @@ int main(int argc, char *argv[])
 		switch (*arg++)
 		{
 			case 'c':
-				select_game = true;
 				break;
 
 			case 'l':
@@ -578,8 +577,7 @@ int main(int argc, char *argv[])
 	pause_line(Term);
 	if (!terms_disconnecting) {
 		/* Play the game */
-		play_game((select_game) ?
-			GAME_SELECT : ((new_game) ? GAME_NEW : GAME_LOAD));
+		play_game(new_game ? GAME_NEW : GAME_SELECT);
 	}
 
 	/* Quit */
