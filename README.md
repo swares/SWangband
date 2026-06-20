@@ -14,11 +14,20 @@ rotate periodically — if you pass on something, it may be gone next visit.
 This makes town trips more meaningful and rewards deeper exploration.
 
 ### Second Wind
-Once per game, instead of dying you receive a second chance: your HP is
-restored to a fraction of maximum and you continue from where you fell.
-The sidebar shows your remaining Second Wind charges ("Wind: 1" when
-available, blank when spent). Enable or disable this at character creation
-with the **Second Wind** birth option.
+Instead of dying you receive a second chance: your HP is restored to a
+fraction of maximum and you continue from where you fell. The sidebar shows
+your remaining charges ("Wind: 1" when available, blank when spent). Enable
+or disable this at character creation with the **Second Wind** birth option.
+
+**Recharging at the Bookseller.** Once your charge is spent you can restore
+it by visiting the Bookseller in town. The service costs a gold donation
+(scales with your character level) plus a 15–20% tithe of your current
+experience — the exact percentage varies each visit. After recharging you
+must descend at least one dungeon level deeper than your current maximum
+before the service is available again, preventing repeated town trips from
+trivializing death. The entry at the bottom of the Bookseller's list shows
+the current status: dim when your charge is still active, blue when you can
+recharge, and orange when the depth requirement has not yet been met.
 
 ### Difficulty Presets
 The first thing you see when starting a new game is a preset picker. Choose
