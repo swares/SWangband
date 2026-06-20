@@ -582,6 +582,7 @@ struct player {
 	uint16_t chp_frac;	/* Cur hit frac (times 2^16) */
 
 	int16_t second_wind;	/* Soft-death charges remaining (0 = spent/off) */
+	int16_t sw_recharge_floor; /* min max_depth for next Temple SW recharge */
 
 	int16_t msp;		/* Max mana pts */
 	int16_t csp;		/* Cur mana pts */

@@ -280,6 +280,34 @@ static void store_display_entry(struct menu *menu, int oid, bool cursor, int row
 	struct store *store = ctx->store;
 	assert(store);
 
+	/* Virtual service entry: Second Wind recharge at the Bookseller/Temple */
+	if (store->feat == FEAT_STORE_BOOK && oid >= (int)store->stock_num) {
+		bool spent = (player->second_wind == 0);
+		bool gated = (player->max_depth < player->sw_recharge_floor);
+		int gold_cost = 500 + player->lev * 50;
+		uint8_t attr;
+		char cost_str[40];
+		if (!spent) {
+			/* Already have a charge — dim */
+			attr = cursor ? COLOUR_L_DARK : COLOUR_L_DARK;
+			c_put_str(attr, "-- Second Wind Recharge --", row, col);
+			c_put_str(attr, "  [charged]", row, ctx->scr_places_x[LOC_PRICE]);
+		} else if (gated) {
+			/* Depth gate not met — show as unavailable */
+			attr = cursor ? COLOUR_ORANGE : COLOUR_RED;
+			c_put_str(attr, "-- Second Wind Recharge --", row, col);
+			strnfmt(cost_str, sizeof(cost_str), "  need L%d  ", player->sw_recharge_floor);
+			c_put_str(attr, cost_str, row, ctx->scr_places_x[LOC_PRICE]);
+		} else {
+			/* Available */
+			attr = cursor ? COLOUR_L_BLUE : COLOUR_BLUE;
+			c_put_str(attr, "-- Second Wind Recharge --", row, col);
+			strnfmt(cost_str, sizeof(cost_str), "%7ld +xp ", (long)gold_cost);
+			c_put_str(attr, cost_str, row, ctx->scr_places_x[LOC_PRICE]);
+		}
+		return;
+	}
+
 	/* Get the object */
 	obj = ctx->list[oid];
 
@@ -394,6 +422,63 @@ static void store_display_frame(struct store_context *ctx)
 /**
  * Display help.
  */
+/**
+ * Temple service: restore a spent Second Wind charge.
+ * Cost: gold (scales with level) + 15-20% of current experience.
+ * Gate: must have gone deeper than sw_recharge_floor since last recharge.
+ */
+static void store_second_wind_recharge(struct store_context *ctx)
+{
+	int xp_pct, gold_cost;
+	int32_t xp_cost;
+	char prompt[200];
+
+	(void)ctx;
+
+	if (!OPT(player, birth_second_wind)) {
+		msg("The priests cannot aid one without the gift of Second Wind.");
+		return;
+	}
+	if (player->second_wind > 0) {
+		msg("Your life force is already renewed — your Second Wind has not been spent.");
+		return;
+	}
+	if (player->max_depth < player->sw_recharge_floor) {
+		msg("The priests sense you have not ventured far enough since your last renewal.");
+		msg("Descend to dungeon level %d before returning.", player->sw_recharge_floor);
+		return;
+	}
+
+	/* Calculate costs: 15-20% XP tithe, gold scales with character level */
+	xp_pct   = 15 + randint0(6);
+	xp_cost  = ((int32_t)player->exp * xp_pct) / 100;
+	gold_cost = 500 + player->lev * 50;
+
+	if (player->au < gold_cost) {
+		msg("The priests require a donation of %d gold — you cannot afford this.", gold_cost);
+		return;
+	}
+
+	strnfmt(prompt, sizeof(prompt),
+		"Restore Second Wind? Costs %d gold and %d%% of your experience (%ld XP). [y/n] ",
+		gold_cost, xp_pct, (long)xp_cost);
+	if (!get_check(prompt))
+		return;
+
+	/* Deduct costs */
+	player->au -= gold_cost;
+	player_exp_lose(player, xp_cost, false);
+
+	/* Restore one charge */
+	player->second_wind = 1;
+
+	/* Require deeper exploration before next recharge */
+	player->sw_recharge_floor = player->max_depth + 1;
+
+	msg("The priests restore your life force. The Second Wind stirs within you.");
+	player->upkeep->redraw |= (PR_GOLD | PR_EXP | PR_HP);
+}
+
 static void store_display_help(struct store_context *ctx)
 {
 	struct store *store = ctx->store;
@@ -818,12 +903,12 @@ static void store_menu_set_selections(struct menu *menu, bool knowledge_menu)
 	} else {
 		if (OPT(player, rogue_like_commands)) {
 			/* These two can't intersect! */
-			menu->cmd_keys = "\x04\x05\x10?={|}~CEIPTdegilpswx"; /* \x10 = ^p , \x04 = ^D, \x05 = ^E */
-			menu->selections = "abcfmnoqrtuvyzABDFGHJKLMNOQRSUVWXYZ";
+			menu->cmd_keys = "\x04\x05\x10?={|}~CEIPRTdegilpswx"; /* \x10 = ^p , \x04 = ^D, \x05 = ^E */
+			menu->selections = "abcfmnoqrtuvyzABDFGHJKLMNOQSUVWXYZ";
 		} else {
 			/* These two can't intersect! */
-			menu->cmd_keys = "\x05\x010?={|}~CEIbdegiklpstwx"; /* \x05 = ^E, \x10 = ^p */
-			menu->selections = "acfhjmnoqruvyzABDFGHJKLMNOPQRSTUVWXYZ";
+			menu->cmd_keys = "\x05\x010?={|}~CEIRbdegiklpstwx"; /* \x05 = ^E, \x10 = ^p */
+			menu->selections = "acfhjmnoqruvyzABDFGHJKLMNOPQSTUVWXYZ";
 		}
 	}
 }
@@ -831,7 +916,12 @@ static void store_menu_set_selections(struct menu *menu, bool knowledge_menu)
 static void store_menu_recalc(struct menu *m)
 {
 	struct store_context *ctx = menu_priv(m);
-	menu_setpriv(m, ctx->store->stock_num, ctx);
+	/* Temple/Bookseller: add virtual Second Wind recharge entry */
+	int count = ctx->store->stock_num;
+	if (ctx->store->feat == FEAT_STORE_BOOK &&
+			OPT(player, birth_second_wind))
+		count++;
+	menu_setpriv(m, count, ctx);
 }
 
 /**
@@ -1057,6 +1147,12 @@ static bool store_menu_handle(struct menu *m, const ui_event *event, int oid)
 	struct store *store = ctx->store;
 	
 	if (event->type == EVT_SELECT) {
+		/* Virtual service: Second Wind recharge (oid past end of stock) */
+		if (store->feat == FEAT_STORE_BOOK && oid >= (int)store->stock_num) {
+			store_second_wind_recharge(ctx);
+			ctx->flags |= (STORE_FRAME_CHANGE | STORE_GOLD_CHANGE);
+			return true;
+		}
 		/* HACK there's no mouse event coordinates to use for */
 		/* menu_store_item, so fake one as if mouse clicked on letter */
 		bool purchased = context_menu_store_item(ctx, oid, 1, m->active.row + oid);
@@ -1172,7 +1268,14 @@ static bool store_menu_handle(struct menu *m, const ui_event *event, int oid)
 				break;
 			}
 
-			default:
+			case 'R':
+				if (store->feat == FEAT_STORE_BOOK) {
+					store_second_wind_recharge(ctx);
+					processed = true;
+				}
+				break;
+
+		default:
 				processed = store_process_command_key(event->key);
 		}
 
