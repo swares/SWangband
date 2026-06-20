@@ -2766,6 +2766,9 @@ static void handle_menu_tile_size(struct sdlpui_control *ctrl,
 		tile_width = mb->v.ranged_int.curr;
 	}
 	refresh_angband_terms(window->app);
+	/* Re-center after tile resize so the window doesn't drift off-screen */
+	SDL_SetWindowPosition(window->window,
+		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 }
 
 static struct sdlpui_dialog *handle_menu_tile_sizes(struct sdlpui_control *ctrl,
